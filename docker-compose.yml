@@ -1,0 +1,25 @@
+version: "3.9"
+
+# Sobe o PostgreSQL local para desenvolvimento.
+# Uso: docker compose up -d
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: estoque_saas_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: estoque
+      POSTGRES_PASSWORD: estoque123
+      POSTGRES_DB: estoque_saas
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U estoque -d estoque_saas"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

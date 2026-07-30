@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# Node
+node_modules/
+.next/
+frontend/.env.local
+
+# IDE
+.idea/
+.vscode/
+frontend/tsconfig.tsbuildinfo
