@@ -34,7 +34,11 @@ async def _get_or_404(session: SessionDep, tenant_id: uuid.UUID, product_id: uui
 async def list_products(session: SessionDep, tenant: TenantDep):
     stmt = (
         select(Product)
-        .where(Product.tenant_id == tenant.id, Product.is_active.is_(True))
+        .where(
+            Product.tenant_id == tenant.id,
+            Product.is_active.is_(True),
+            Product.deleted_at.is_(None),  # filtro padrão: ignora excluídos
+        )
         .order_by(Product.name)
     )
     return (await session.execute(stmt)).scalars().all()

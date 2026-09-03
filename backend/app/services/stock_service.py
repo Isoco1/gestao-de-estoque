@@ -214,6 +214,10 @@ async def process_sale(
     shortages: list[str] = []
     for ing_id, needed in needs.items():
         ing = ingredients[ing_id]
+        # Ingrediente excluído (soft delete) não pode compor vendas
+        if ing.is_deleted:
+            shortages.append(f"{ing.name} (ingrediente excluído do estoque)")
+            continue
         available = sum(
             (lot.current_quantity for lot in lots_by_ingredient.get(ing_id, [])
              if not lot.is_expired()),

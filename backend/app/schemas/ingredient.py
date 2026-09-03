@@ -39,6 +39,16 @@ class IngredientRead(IngredientBase):
     is_active: bool
 
 
+class IngredientDelete(BaseModel):
+    """Corpo obrigatório do DELETE: nenhum ingrediente sai sem justificativa."""
+
+    reason: str = Field(
+        min_length=5,
+        max_length=500,
+        description="Justificativa da exclusão (mínimo 5 caracteres)",
+    )
+
+
 class StockEntryCreate(BaseModel):
     """Lançamento manual simples.
 

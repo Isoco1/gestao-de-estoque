@@ -17,7 +17,7 @@ app = FastAPI(
     title="Gestão de Estoque",
     description="Gestão de estoque multi-tenant para restaurantes, deliveries e mercados "
     "com baixa automática via WhatsApp (Z-API).",
-    version="0.1.0",
+    version="0.3.0",
 )
 
 # CORS: libera o frontend Next.js

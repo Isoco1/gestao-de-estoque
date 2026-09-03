@@ -28,7 +28,48 @@ from app.models import (
     ProductRecipe,
     StockMovement,
     Tenant,
+    User,
+    UserRole,
 )
+
+
+async def _ensure_users(session, tenant: Tenant) -> None:
+    """Garante os usuários de demonstração (idempotente).
+
+    Sem login JWT ainda: as senhas são placeholders. Os IDs impressos
+    servem para o header X-User-ID (painel admin e auditoria).
+    """
+    super_admin = (
+        await session.execute(select(User).where(User.role == UserRole.SUPER_ADMIN))
+    ).scalars().first()
+    if not super_admin:
+        super_admin = User(
+            tenant_id=None,  # SUPER_ADMIN é global (sem tenant)
+            name="Admin da Plataforma",
+            email="admin@plataforma.local",
+            hashed_password="!definir-com-jwt",
+            role=UserRole.SUPER_ADMIN,
+        )
+        session.add(super_admin)
+
+    owner = (
+        await session.execute(
+            select(User).where(User.tenant_id == tenant.id, User.email == "dono@pizzariademo.local")
+        )
+    ).scalar_one_or_none()
+    if not owner:
+        owner = User(
+            tenant_id=tenant.id,
+            name="Dono da Pizzaria",
+            email="dono@pizzariademo.local",
+            hashed_password="!definir-com-jwt",
+            role=UserRole.TENANT_ADMIN,
+        )
+        session.add(owner)
+
+    await session.commit()
+    print(f"SUPER_ADMIN User ID (header X-User-ID): {super_admin.id}")
+    print(f"TENANT_ADMIN User ID (header X-User-ID): {owner.id}")
 
 
 def _lot(
@@ -81,6 +122,7 @@ async def seed() -> None:
         ).scalar_one_or_none()
         if existing:
             print(f"Seed já executado. Tenant ID: {existing.id}")
+            await _ensure_users(session, existing)
             return
 
         tenant = Tenant(
@@ -146,6 +188,7 @@ async def seed() -> None:
         await session.commit()
         print("Seed concluído!")
         print(f"Tenant ID (use no header X-Tenant-ID): {tenant.id}")
+        await _ensure_users(session, tenant)
 
 
 if __name__ == "__main__":

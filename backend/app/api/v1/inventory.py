@@ -37,6 +37,9 @@ async def expiration_alerts(
                 IngredientLot.current_quantity > 0,
                 IngredientLot.expiration_date.is_not(None),
                 IngredientLot.expiration_date <= limit_date,
+                # filtro padrão: ignora lotes/ingredientes excluídos
+                IngredientLot.deleted_at.is_(None),
+                Ingredient.deleted_at.is_(None),
             )
             .order_by(IngredientLot.expiration_date.asc())
         )

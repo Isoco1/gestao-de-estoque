@@ -1,34 +1,42 @@
-"""CRUD de Ingredientes + gestão de Lotes (validade/fornecedor) + lançamentos."""
+"""CRUD de Ingredientes + gestão de Lotes (validade/fornecedor) + lançamentos.
+
+Exclusão: SEMPRE lógica (soft delete) com justificativa obrigatória e
+registro em AuditLog — DELETE físico é proibido em tabelas críticas.
+"""
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from app.api.deps import SessionDep, TenantDep
+from app.api.deps import OptionalUserDep, SessionDep, TenantDep
 from app.models.ingredient import Ingredient
 from app.models.ingredient_lot import IngredientLot
 from app.models.stock_movement import MovementType, StockMovement
 from app.schemas.ingredient import (
     IngredientCreate,
+    IngredientDelete,
     IngredientRead,
     IngredientUpdate,
     StockEntryCreate,
 )
 from app.schemas.lot import IngredientLotsRead, LotCreate, LotRead
+from app.services.audit_service import log_action
 from app.services.stock_service import InsufficientStockError, register_loss
 
 router = APIRouter(prefix="/ingredients", tags=["Ingredientes"])
 
 
 async def _get_or_404(session: SessionDep, tenant_id: uuid.UUID, ingredient_id: uuid.UUID) -> Ingredient:
-    """Busca o ingrediente SEMPRE filtrando por tenant (isolamento)."""
+    """Busca o ingrediente SEMPRE filtrando por tenant e ignorando deletados."""
     ingredient = (
         await session.execute(
             select(Ingredient).where(
-                Ingredient.id == ingredient_id, Ingredient.tenant_id == tenant_id
+                Ingredient.id == ingredient_id,
+                Ingredient.tenant_id == tenant_id,
+                Ingredient.deleted_at.is_(None),
             )
         )
     ).scalar_one_or_none()
@@ -82,7 +90,9 @@ def _add_lot(
 async def list_ingredients(session: SessionDep, tenant: TenantDep, only_critical: bool = False):
     """Lista ingredientes; `only_critical=true` retorna apenas estoque crítico."""
     stmt = select(Ingredient).where(
-        Ingredient.tenant_id == tenant.id, Ingredient.is_active.is_(True)
+        Ingredient.tenant_id == tenant.id,
+        Ingredient.is_active.is_(True),
+        Ingredient.deleted_at.is_(None),  # filtro padrão: ignora excluídos
     )
     if only_critical:
         # Estoque total = soma dos lotes com saldo (subquery correlacionada)
@@ -150,10 +160,32 @@ async def update_ingredient(
 
 
 @router.delete("/{ingredient_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def deactivate_ingredient(ingredient_id: uuid.UUID, session: SessionDep, tenant: TenantDep):
-    """Soft delete: preserva o histórico de movimentações e fichas técnicas."""
+async def delete_ingredient(
+    ingredient_id: uuid.UUID,
+    payload: IngredientDelete,
+    session: SessionDep,
+    tenant: TenantDep,
+    user: OptionalUserDep,
+):
+    """Exclusão lógica com justificativa OBRIGATÓRIA (mínimo 5 caracteres).
+
+    Nunca executa DELETE físico: preenche deleted_at/deleted_by/reason e
+    grava o AuditLog na mesma transação. Restauração: painel SUPER_ADMIN.
+    """
     ingredient = await _get_or_404(session, tenant.id, ingredient_id)
-    ingredient.is_active = False
+
+    ingredient.deleted_at = datetime.now(timezone.utc)
+    ingredient.deleted_by_id = user.id if user else None
+    ingredient.deletion_reason = payload.reason
+    log_action(
+        session,
+        tenant_id=tenant.id,
+        user=user,
+        action="DELETE_INGREDIENT",
+        resource_name="Ingredient",
+        resource_id=ingredient.id,
+        reason=payload.reason,
+    )
     await session.commit()
 
 

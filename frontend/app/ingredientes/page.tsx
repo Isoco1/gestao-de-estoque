@@ -99,10 +99,19 @@ export default function IngredientesPage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Desativar este ingrediente?")) return;
+  async function handleDelete(id: string, name: string) {
+    // Justificativa obrigatória: a API rejeita exclusões sem motivo (422)
+    const reason = prompt(
+      `Excluir "${name}"?\n\nInforme a justificativa da exclusão (mínimo 5 caracteres):`
+    );
+    if (reason === null) return; // usuário cancelou
+    if (reason.trim().length < 5) {
+      setError("A justificativa da exclusão precisa ter no mínimo 5 caracteres.");
+      return;
+    }
     try {
-      await api.deleteIngredient(id);
+      setError(null);
+      await api.deleteIngredient(id, reason.trim());
       await load();
     } catch (err) {
       setError((err as Error).message);
@@ -270,8 +279,8 @@ export default function IngredientesPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDelete(ing.id)}
-                          title="Desativar"
+                          onClick={() => handleDelete(ing.id, ing.name)}
+                          title="Excluir (exige justificativa)"
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>

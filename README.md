@@ -1,11 +1,30 @@
 # Gestão de Estoque 🍕📦
 
+**Versão atual: 0.3.0** — histórico completo em [CHANGELOG.md](CHANGELOG.md)
+
 SaaS multi-tenant de gestão de estoque para pequenos restaurantes, deliveries e
 mercados, com **baixa automática de estoque via WhatsApp (Z-API)**.
 
 O estoque é controlado **por lotes** (validade, fornecedor e custo por lote):
 o saldo de um ingrediente é a soma dos seus lotes ativos, e as baixas seguem
 **FEFO** (*First Expired, First Out* — consome primeiro o lote que vence antes).
+
+## Funcionalidades
+
+- ✅ **Multi-tenant** com isolamento por `tenant_id` em todas as tabelas
+- ✅ **Baixa automática via WhatsApp**: webhook Z-API interpreta o pedido e
+  desconta a ficha técnica do estoque em transação atômica (ACID)
+- ✅ **Controle por lotes com FEFO**: validade, fabricação, fornecedor e
+  custo por lote; vendas nunca consomem lote vencido
+- ✅ **Alertas**: estoque baixo (WhatsApp do gerente) e vencimentos com
+  R$ em risco no dashboard
+- ✅ **Status da conexão Z-API** no dashboard (nunca derruba a aplicação)
+- ✅ **Bloqueio de inadimplentes** (v0.3): tenant `BLOCKED` recebe 403 em
+  toda a API; `PAST_DUE` mantém acesso em carência
+- ✅ **RBAC** (v0.3): papéis `SUPER_ADMIN`, `TENANT_ADMIN` e `TENANT_USER`
+- ✅ **Soft delete com auditoria** (v0.3): exclusão de ingrediente exige
+  justificativa (mínimo 5 caracteres), nunca apaga fisicamente, registra
+  quem/quando/por quê em `AuditLog` e é restaurável pelo painel admin
 
 ## Stack
 
@@ -124,6 +143,21 @@ Painel: http://localhost:3000
 | `GET /api/v1/inventory/expiration-alerts?days=7` | Lotes vencidos e a vencer, com R$ em risco |
 | `GET /api/v1/integrations/z-api/status` | Status da conexão WhatsApp (nunca retorna 5xx) |
 | `POST /api/v1/ingredients/{id}/stock-entries` | Entrada avulsa (+) ou perda/descarte FEFO (−, inclui vencidos) |
+| `DELETE /api/v1/ingredients/{id}` | Exclusão lógica — corpo `{"reason": "..."}` obrigatório (mín. 5 caracteres) |
+| `GET /api/v1/admin/tenants/{id}/deleted-ingredients` | (SUPER_ADMIN) Excluídos do tenant: quem, quando e justificativa |
+| `POST /api/v1/admin/ingredients/{id}/restore` | (SUPER_ADMIN) Restaura ingrediente excluído, com auditoria |
+
+## Acesso e segurança (v0.3)
+
+- **Identificação (MVP, pré-JWT)**: `X-Tenant-ID` identifica o tenant e
+  `X-User-ID` o usuário (auditoria e rotas `/admin`). O seed imprime os IDs
+  de demonstração (SUPER_ADMIN e TENANT_ADMIN).
+- **Bloqueio automático**: `Tenant.status = blocked` → toda rota responde
+  `403 "Assinatura suspensa. Entre em contato com o suporte..."`, e o
+  webhook ignora as vendas. `past_due` mantém o acesso (carência).
+- **Regra de ouro do soft delete**: nenhuma exclusão física em tabelas
+  críticas; listagens filtram `deleted_at IS NULL` automaticamente e cada
+  exclusão/restauração gera um registro imutável em `audit_logs`.
 
 ### Testar o webhook sem WhatsApp
 

@@ -6,10 +6,10 @@ from sqlalchemy import Boolean, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
-from app.models.base import TenantMixin, TimestampMixin, uuid_pk
+from app.models.base import SoftDeleteMixin, TenantMixin, TimestampMixin, uuid_pk
 
 
-class Product(Base, TenantMixin, TimestampMixin):
+class Product(Base, TenantMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "products"
     __table_args__ = (
         UniqueConstraint("tenant_id", "name", name="uq_products_tenant_name"),

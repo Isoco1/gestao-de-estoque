@@ -17,7 +17,7 @@ from sqlalchemy import select
 
 from app.api.deps import SessionDep
 from app.models.order import OrderSource
-from app.models.tenant import Tenant
+from app.models.tenant import Tenant, TenantStatus
 from app.schemas.webhook import ZapiWebhookPayload
 from app.services.order_parser import parse_order_message
 from app.services.stock_service import InsufficientStockError, process_sale
@@ -61,6 +61,11 @@ async def zapi_webhook(
     if not tenant:
         logger.warning("Webhook de instância desconhecida: %s", payload.instance_id)
         return {"status": "ignored", "reason": "instância não cadastrada"}
+
+    # Tenant bloqueado por inadimplência: nenhuma venda é registrada
+    if tenant.status == TenantStatus.BLOCKED:
+        logger.warning("Webhook ignorado: tenant %s está bloqueado", tenant.slug)
+        return {"status": "ignored", "reason": "assinatura suspensa"}
 
     # Desanexa o tenant da sessão: um rollback expira objetos anexados, e o
     # tenant ainda é lido depois (logs e envio de mensagens em background).

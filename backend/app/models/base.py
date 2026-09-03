@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Uuid, func
+from sqlalchemy import DateTime, ForeignKey, Text, Uuid, func
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column
 
 
@@ -35,6 +35,29 @@ class TenantMixin:
             nullable=False,
             index=True,
         )
+
+
+class SoftDeleteMixin:
+    """Exclusão lógica com trilha de auditoria.
+
+    Regra de ouro: NUNCA executar DELETE físico em tabelas críticas.
+    A "exclusão" preenche deleted_at/deleted_by_id/deletion_reason, e
+    TODA listagem deve filtrar `deleted_at IS NULL`.
+    """
+
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+    @declared_attr
+    def deleted_by_id(cls) -> Mapped[uuid.UUID | None]:  # noqa: N805 - padrão SQLAlchemy
+        return mapped_column(
+            Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        )
+
+    deletion_reason: Mapped[str | None] = mapped_column(Text, default=None)
+
+    @property
+    def is_deleted(self) -> bool:
+        return self.deleted_at is not None
 
 
 def uuid_pk() -> Mapped[uuid.UUID]:

@@ -109,7 +109,12 @@ export const api = {
     stock_quantity: string;
     min_stock: string;
   }) => request<Ingredient>("/ingredients", { method: "POST", body: JSON.stringify(data) }),
-  deleteIngredient: (id: string) => request<void>(`/ingredients/${id}`, { method: "DELETE" }),
+  // Exclusão lógica: justificativa obrigatória (mínimo 5 caracteres)
+  deleteIngredient: (id: string, reason: string) =>
+    request<void>(`/ingredients/${id}`, {
+      method: "DELETE",
+      body: JSON.stringify({ reason }),
+    }),
 
   // Lotes (janela de detalhes do ingrediente)
   listLots: (ingredientId: string) =>

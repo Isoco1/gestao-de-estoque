@@ -13,10 +13,10 @@ from sqlalchemy import Date, ForeignKey, Numeric, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
-from app.models.base import TenantMixin, TimestampMixin, uuid_pk
+from app.models.base import SoftDeleteMixin, TenantMixin, TimestampMixin, uuid_pk
 
 
-class IngredientLot(Base, TenantMixin, TimestampMixin):
+class IngredientLot(Base, TenantMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "ingredient_lots"
 
     id: Mapped[uuid.UUID] = uuid_pk()
