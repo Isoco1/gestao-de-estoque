@@ -11,6 +11,7 @@ import {
   type Ingredient,
   type ZapiStatus,
 } from "@/lib/api";
+import { expirationBadge, fmtDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -139,33 +140,26 @@ export default function DashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {expirationItems.map((item) => (
-                  <TableRow key={item.lot_id}>
-                    <TableCell className="font-medium">{item.ingredient_name}</TableCell>
-                    <TableCell>
-                      {item.supplier_brand}
-                      {item.batch_number ? ` — ${item.batch_number}` : ""}
-                    </TableCell>
-                    <TableCell>
-                      {new Date(`${item.expiration_date}T00:00:00`).toLocaleDateString("pt-BR")}
-                    </TableCell>
-                    <TableCell>
-                      {item.quantity} {item.unit}
-                    </TableCell>
-                    <TableCell>R$ {parseFloat(item.value_at_risk).toFixed(2)}</TableCell>
-                    <TableCell>
-                      {item.status === "vencido" ? (
-                        <Badge variant="destructive">
-                          Vencido há {Math.abs(item.days_to_expiration)}d
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-amber-500 text-white hover:bg-amber-500">
-                          Vence em {item.days_to_expiration}d
-                        </Badge>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {expirationItems.map((item) => {
+                  const badge = expirationBadge(item.days_to_expiration);
+                  return (
+                    <TableRow key={item.lot_id}>
+                      <TableCell className="font-medium">{item.ingredient_name}</TableCell>
+                      <TableCell>
+                        {item.supplier_brand}
+                        {item.batch_number ? ` — ${item.batch_number}` : ""}
+                      </TableCell>
+                      <TableCell>{fmtDate(item.expiration_date)}</TableCell>
+                      <TableCell>
+                        {item.quantity} {item.unit}
+                      </TableCell>
+                      <TableCell>R$ {parseFloat(item.value_at_risk).toFixed(2)}</TableCell>
+                      <TableCell>
+                        <Badge variant={badge.variant}>{badge.label}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}

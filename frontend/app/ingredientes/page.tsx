@@ -9,6 +9,7 @@ import {
   type IngredientLots,
   type MeasureUnit,
 } from "@/lib/api";
+import { daysUntil, expirationBadge, fmtDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,22 +27,12 @@ const UNITS: { value: MeasureUnit; label: string }[] = [
   { value: "un", label: "Unidade (un)" },
 ];
 
-/** Formata "YYYY-MM-DD" para pt-BR sem efeito de fuso horário. */
-function fmtDate(iso: string | null): string {
-  if (!iso) return "—";
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("pt-BR");
-}
-
 /** Situação do lote para o badge da tabela de detalhes. */
 function lotStatus(lot: { current_quantity: string; expiration_date: string | null }) {
   if (parseFloat(lot.current_quantity) <= 0) return { label: "Esgotado", variant: "secondary" as const };
   if (!lot.expiration_date) return { label: "Ativo", variant: "outline" as const };
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const expiration = new Date(`${lot.expiration_date}T00:00:00`);
-  const days = Math.round((expiration.getTime() - today.getTime()) / 86_400_000);
-  if (days < 0) return { label: `Vencido há ${-days}d`, variant: "destructive" as const };
-  if (days <= 7) return { label: `Vence em ${days}d`, variant: "warning" as const };
+  const days = daysUntil(lot.expiration_date);
+  if (days <= 7) return expirationBadge(days);
   return { label: "Ativo", variant: "outline" as const };
 }
 
@@ -448,13 +439,7 @@ export default function IngredientesPage() {
                             {new Date(lot.created_at).toLocaleDateString("pt-BR")}
                           </TableCell>
                           <TableCell>
-                            {status.variant === "warning" ? (
-                              <Badge className="bg-amber-500 text-white hover:bg-amber-500">
-                                {status.label}
-                              </Badge>
-                            ) : (
-                              <Badge variant={status.variant}>{status.label}</Badge>
-                            )}
+                            <Badge variant={status.variant}>{status.label}</Badge>
                           </TableCell>
                         </TableRow>
                       );
