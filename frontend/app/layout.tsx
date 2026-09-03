@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChefHat, LayoutDashboard, Package, UtensilsCrossed } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,8 +18,22 @@ const NAV_ITEMS = [
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR">
+    // suppressHydrationWarning: a classe "dark" é aplicada antes da hidratação
+    <html lang="pt-BR" suppressHydrationWarning>
+      <head>
+        {/* Reaplica o tema salvo ANTES do primeiro paint (evita flash claro) */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              'try{if(localStorage.getItem("theme")==="dark")document.documentElement.classList.add("dark")}catch(e){}',
+          }}
+        />
+      </head>
       <body className="min-h-screen">
+        {/* Alternador de tema: canto superior direito, visível em toda página */}
+        <div className="fixed right-4 top-4 z-50">
+          <ThemeToggle />
+        </div>
         <div className="flex min-h-screen">
           {/* Sidebar */}
           <aside className="w-60 shrink-0 border-r bg-card p-4">

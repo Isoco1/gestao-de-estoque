@@ -22,6 +22,25 @@
     --ring: 24 95% 47%;
     --radius: 0.5rem;
   }
+
+  /* Tema escuro (cinza escuro) — ativado pela classe .dark no <html> */
+  .dark {
+    --background: 240 4% 12%;
+    --foreground: 0 0% 95%;
+    --card: 240 4% 16%;
+    --card-foreground: 0 0% 95%;
+    --primary: 24 95% 53%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4% 22%;
+    --secondary-foreground: 0 0% 90%;
+    --muted: 240 4% 22%;
+    --muted-foreground: 240 5% 65%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 4% 26%;
+    --input: 240 4% 26%;
+    --ring: 24 95% 53%;
+  }
 }
 
 @layer base {

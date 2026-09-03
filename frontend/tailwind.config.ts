@@ -2,6 +2,7 @@ import type { Config } from "tailwindcss";
 
 // Tokens de cor no padrão Shadcn/UI (variáveis CSS em globals.css)
 const config: Config = {
+  darkMode: "class",
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
   theme: {
     extend: {
