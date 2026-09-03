@@ -13,7 +13,6 @@ export interface Ingredient {
   total_quantity: string; // Decimal serializado como string (soma dos lotes)
   min_stock: string;
   cost_per_unit: string | null;
-  is_active: boolean;
 }
 
 export interface Lot {
@@ -75,7 +74,6 @@ export interface Product {
   id: string;
   name: string;
   price: string;
-  is_active: boolean;
   recipe_items: RecipeItem[];
 }
 

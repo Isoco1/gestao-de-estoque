@@ -36,9 +36,18 @@ async def list_deleted_ingredients(tenant_id: uuid.UUID, session: SessionDep):
     if not tenant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant não encontrado")
 
+    # Só as colunas usadas do ingrediente: carregar a entidade inteira
+    # dispararia o selectin de todos os lotes de cada ingrediente excluído.
     rows = (
         await session.execute(
-            select(Ingredient, User)
+            select(
+                Ingredient.id,
+                Ingredient.name,
+                Ingredient.unit,
+                Ingredient.deleted_at,
+                Ingredient.deletion_reason,
+                User,
+            )
             .outerjoin(User, User.id == Ingredient.deleted_by_id)
             .where(
                 Ingredient.tenant_id == tenant_id,
@@ -50,14 +59,14 @@ async def list_deleted_ingredients(tenant_id: uuid.UUID, session: SessionDep):
 
     return [
         DeletedIngredientRead(
-            id=ingredient.id,
-            name=ingredient.name,
-            unit=ingredient.unit,
-            deleted_at=ingredient.deleted_at,
-            deletion_reason=ingredient.deletion_reason,
+            id=ingredient_id,
+            name=name,
+            unit=unit,
+            deleted_at=deleted_at,
+            deletion_reason=deletion_reason,
             deleted_by=DeletedByRead.model_validate(deleted_by) if deleted_by else None,
         )
-        for ingredient, deleted_by in rows
+        for ingredient_id, name, unit, deleted_at, deletion_reason, deleted_by in rows
     ]
 
 
@@ -94,5 +103,6 @@ async def restore_ingredient(
         reason=f"Restauração via painel admin (exclusão original: {original_reason})",
     )
     await session.commit()
-    await session.refresh(ingredient, ["lots"])
+    # Sem refresh: expire_on_commit=False mantém a instância válida e os
+    # lotes já vieram no selectin da consulta inicial.
     return ingredient

@@ -22,6 +22,7 @@ from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import noload
 
 from app.models.ingredient import Ingredient
 from app.models.ingredient_lot import IngredientLot
@@ -119,14 +120,26 @@ async def _match_products(
     """Mapeia nomes livres da mensagem para produtos do tenant (case-insensitive)."""
     matched: list[tuple[Product, int]] = []
     unmatched: list[str] = []
+    if not parsed_items:
+        return matched, unmatched
 
-    for item in parsed_items:
-        stmt = select(Product).where(
+    # Uma única consulta para todos os nomes; noload evita carregar a ficha
+    # técnica em cascata (ela é buscada de uma vez em process_sale).
+    stmt = (
+        select(Product)
+        .where(
             Product.tenant_id == tenant_id,
-            Product.is_active.is_(True),
-            func.lower(Product.name) == item.product_name.lower(),
+            Product.deleted_at.is_(None),
+            func.lower(Product.name).in_({item.product_name.lower() for item in parsed_items}),
         )
-        product = (await session.execute(stmt)).scalar_one_or_none()
+        .options(noload(Product.recipe_items))
+    )
+    products_by_name = {
+        product.name.lower(): product
+        for product in (await session.execute(stmt)).scalars()
+    }
+    for item in parsed_items:
+        product = products_by_name.get(item.product_name.lower())
         if product:
             matched.append((product, item.quantity))
         else:
@@ -179,31 +192,40 @@ async def process_sale(
         raise ValueError("Nenhum produto da mensagem foi reconhecido no cardápio")
 
     # ---- 1. Agrega a necessidade total por ingrediente (BOM x quantidade) ----
-    needs: dict[uuid.UUID, Decimal] = {}
+    qty_by_product: dict[uuid.UUID, int] = {}
     for product, qty in matched:
-        recipe = (
-            await session.execute(
-                select(ProductRecipe).where(
-                    ProductRecipe.tenant_id == tenant_id,
-                    ProductRecipe.product_id == product.id,
-                )
+        qty_by_product[product.id] = qty_by_product.get(product.id, 0) + qty
+
+    # Todas as fichas técnicas em uma única consulta; noload evita o joined
+    # load de ProductRecipe.ingredient (os metadados vêm na consulta abaixo).
+    recipe_items = (
+        await session.execute(
+            select(ProductRecipe)
+            .where(
+                ProductRecipe.tenant_id == tenant_id,
+                ProductRecipe.product_id.in_(qty_by_product.keys()),
             )
-        ).scalars().all()
-        for recipe_item in recipe:
-            needs[recipe_item.ingredient_id] = (
-                needs.get(recipe_item.ingredient_id, Decimal("0"))
-                + recipe_item.quantity * qty
-            )
+            .options(noload(ProductRecipe.ingredient))
+        )
+    ).scalars().all()
+    needs: dict[uuid.UUID, Decimal] = {}
+    for recipe_item in recipe_items:
+        needs[recipe_item.ingredient_id] = (
+            needs.get(recipe_item.ingredient_id, Decimal("0"))
+            + recipe_item.quantity * qty_by_product[recipe_item.product_id]
+        )
 
     # Metadados dos ingredientes (nome/unidade/mínimo) — sem lock: quem é
-    # travado agora são os LOTES, a fonte de verdade do saldo.
+    # travado agora são os LOTES, a fonte de verdade do saldo. noload em
+    # lots: o selectin carregaria todos os lotes que _lock_lots já vai
+    # rebuscar com FOR UPDATE logo em seguida.
     ingredients: dict[uuid.UUID, Ingredient] = {}
     if needs:
         rows = (
             await session.execute(
-                select(Ingredient).where(
-                    Ingredient.tenant_id == tenant_id, Ingredient.id.in_(needs.keys())
-                )
+                select(Ingredient)
+                .where(Ingredient.tenant_id == tenant_id, Ingredient.id.in_(needs.keys()))
+                .options(noload(Ingredient.lots))
             )
         ).scalars().all()
         ingredients = {ing.id: ing for ing in rows}

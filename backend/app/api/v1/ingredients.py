@@ -12,12 +12,13 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import OptionalUserDep, SessionDep, TenantDep
+from app.api.helpers import get_tenant_entity_or_404
 from app.models.ingredient import Ingredient
 from app.models.ingredient_lot import IngredientLot
 from app.models.stock_movement import MovementType, StockMovement
+from app.schemas.common import SoftDeleteRequest
 from app.schemas.ingredient import (
     IngredientCreate,
-    IngredientDelete,
     IngredientRead,
     IngredientUpdate,
     StockEntryCreate,
@@ -30,19 +31,10 @@ router = APIRouter(prefix="/ingredients", tags=["Ingredientes"])
 
 
 async def _get_or_404(session: SessionDep, tenant_id: uuid.UUID, ingredient_id: uuid.UUID) -> Ingredient:
-    """Busca o ingrediente SEMPRE filtrando por tenant e ignorando deletados."""
-    ingredient = (
-        await session.execute(
-            select(Ingredient).where(
-                Ingredient.id == ingredient_id,
-                Ingredient.tenant_id == tenant_id,
-                Ingredient.deleted_at.is_(None),
-            )
-        )
-    ).scalar_one_or_none()
-    if not ingredient:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ingrediente não encontrado")
-    return ingredient
+    return await get_tenant_entity_or_404(
+        session, Ingredient, tenant_id, ingredient_id,
+        not_found_detail="Ingrediente não encontrado",
+    )
 
 
 def _add_lot(
@@ -91,7 +83,6 @@ async def list_ingredients(session: SessionDep, tenant: TenantDep, only_critical
     """Lista ingredientes; `only_critical=true` retorna apenas estoque crítico."""
     stmt = select(Ingredient).where(
         Ingredient.tenant_id == tenant.id,
-        Ingredient.is_active.is_(True),
         Ingredient.deleted_at.is_(None),  # filtro padrão: ignora excluídos
     )
     if only_critical:
@@ -155,14 +146,14 @@ async def update_ingredient(
     for field_name, value in payload.model_dump(exclude_unset=True).items():
         setattr(ingredient, field_name, value)
     await session.commit()
-    await session.refresh(ingredient)
+    # Sem refresh: expire_on_commit=False mantém a instância válida após o commit
     return ingredient
 
 
 @router.delete("/{ingredient_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_ingredient(
     ingredient_id: uuid.UUID,
-    payload: IngredientDelete,
+    payload: SoftDeleteRequest,
     session: SessionDep,
     tenant: TenantDep,
     user: OptionalUserDep,

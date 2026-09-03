@@ -13,6 +13,25 @@ from app.models.tenant import Tenant
 
 logger = logging.getLogger(__name__)
 
+# Cliente HTTP único do processo: reutiliza conexões (keep-alive) entre as
+# chamadas em vez de abrir/fechar um cliente por requisição. Fechado no
+# lifespan da aplicação (app/main.py).
+_http_client: httpx.AsyncClient | None = None
+
+
+def get_http_client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None or _http_client.is_closed:
+        _http_client = httpx.AsyncClient(timeout=10)
+    return _http_client
+
+
+async def close_http_client() -> None:
+    global _http_client
+    if _http_client is not None and not _http_client.is_closed:
+        await _http_client.aclose()
+    _http_client = None
+
 
 class ZapiClient:
     """Encapsula chamadas à Z-API (Single Responsibility)."""
@@ -32,19 +51,17 @@ class ZapiClient:
         Levanta httpx.HTTPError em falha de rede/HTTP — o chamador decide
         como degradar (ver check_connection).
         """
-        async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.get(f"{self._base_url}/status", headers=self._headers)
-            response.raise_for_status()
-            return response.json()
+        response = await get_http_client().get(f"{self._base_url}/status", headers=self._headers)
+        response.raise_for_status()
+        return response.json()
 
     async def get_device_phone(self) -> str | None:
         """Retorna o número de telefone conectado à instância, se disponível."""
-        async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.get(f"{self._base_url}/device", headers=self._headers)
-            response.raise_for_status()
-            data = response.json()
-            phone = data.get("phone")
-            return str(phone) if phone else None
+        response = await get_http_client().get(f"{self._base_url}/device", headers=self._headers)
+        response.raise_for_status()
+        data = response.json()
+        phone = data.get("phone")
+        return str(phone) if phone else None
 
     async def send_text(self, phone: str, message: str) -> bool:
         """Envia mensagem de texto. Retorna True em caso de sucesso.
@@ -53,14 +70,13 @@ class ZapiClient:
         estoque já foi commitada); por isso capturamos e logamos o erro.
         """
         try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                response = await client.post(
-                    f"{self._base_url}/send-text",
-                    json={"phone": phone, "message": message},
-                    headers=self._headers,
-                )
-                response.raise_for_status()
-                return True
+            response = await get_http_client().post(
+                f"{self._base_url}/send-text",
+                json={"phone": phone, "message": message},
+                headers=self._headers,
+            )
+            response.raise_for_status()
+            return True
         except httpx.HTTPError as exc:
             logger.error("Falha ao enviar mensagem Z-API para %s: %s", phone, exc)
             return False

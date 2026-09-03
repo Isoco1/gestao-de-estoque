@@ -28,9 +28,11 @@ async def expiration_alerts(
     today = date.today()
     limit_date = today + timedelta(days=days)
 
+    # Só as colunas usadas do ingrediente: carregar a entidade inteira
+    # dispararia o selectin de TODOS os lotes de cada ingrediente.
     rows = (
         await session.execute(
-            select(IngredientLot, Ingredient)
+            select(IngredientLot, Ingredient.id, Ingredient.name, Ingredient.unit)
             .join(Ingredient, IngredientLot.ingredient_id == Ingredient.id)
             .where(
                 IngredientLot.tenant_id == tenant.id,
@@ -49,14 +51,14 @@ async def expiration_alerts(
     expiring_soon: list[ExpirationAlertItem] = []
     total_value = Decimal("0")
 
-    for lot, ingredient in rows:
+    for lot, ingredient_id, ingredient_name, ingredient_unit in rows:
         value_at_risk = (lot.current_quantity * lot.unit_cost).quantize(Decimal("0.01"))
         total_value += value_at_risk
         item = ExpirationAlertItem(
             lot_id=lot.id,
-            ingredient_id=ingredient.id,
-            ingredient_name=ingredient.name,
-            unit=ingredient.unit.value,
+            ingredient_id=ingredient_id,
+            ingredient_name=ingredient_name,
+            unit=ingredient_unit.value,
             supplier_brand=lot.supplier_brand,
             batch_number=lot.batch_number,
             expiration_date=lot.expiration_date,

@@ -3,7 +3,7 @@ import enum
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Enum, Numeric, String, UniqueConstraint
+from sqlalchemy import Enum, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -39,8 +39,6 @@ class Ingredient(Base, TenantMixin, TimestampMixin, SoftDeleteMixin):
     )
     # Custo de referência por unidade (o custo real vive em cada lote)
     cost_per_unit: Mapped[Decimal | None] = mapped_column(Numeric(12, 4))
-
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # Lotes do ingrediente, na ordem de consumo FEFO (validade mais próxima
     # primeiro; sem validade por último). selectin: carrega junto sem N+1,

@@ -27,7 +27,6 @@ class IngredientUpdate(BaseModel):
     unit: MeasureUnit | None = None
     min_stock: Decimal | None = Field(default=None, ge=0)
     cost_per_unit: Decimal | None = Field(default=None, ge=0)
-    is_active: bool | None = None
 
 
 class IngredientRead(IngredientBase):
@@ -36,17 +35,6 @@ class IngredientRead(IngredientBase):
     id: uuid.UUID
     # Propriedade calculada no modelo: soma dos lotes com saldo
     total_quantity: Decimal
-    is_active: bool
-
-
-class IngredientDelete(BaseModel):
-    """Corpo obrigatório do DELETE: nenhum ingrediente sai sem justificativa."""
-
-    reason: str = Field(
-        min_length=5,
-        max_length=500,
-        description="Justificativa da exclusão (mínimo 5 caracteres)",
-    )
 
 
 class StockEntryCreate(BaseModel):

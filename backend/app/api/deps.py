@@ -101,12 +101,7 @@ async def get_super_admin(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Header X-User-ID ausente",
         )
-    user_uuid = _parse_uuid(x_user_id, "X-User-ID")
-    user = (
-        await session.execute(
-            select(User).where(User.id == user_uuid, User.is_active.is_(True))
-        )
-    ).scalar_one_or_none()
+    user = await get_current_user_optional(session, x_user_id)
     if not user or user.role != UserRole.SUPER_ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

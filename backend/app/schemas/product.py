@@ -31,7 +31,6 @@ class ProductCreate(BaseModel):
 class ProductUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     price: Decimal | None = Field(default=None, ge=0)
-    is_active: bool | None = None
 
 
 class ProductRead(BaseModel):
@@ -40,7 +39,6 @@ class ProductRead(BaseModel):
     id: uuid.UUID
     name: str
     price: Decimal
-    is_active: bool
     recipe_items: list[RecipeItemRead] = []
 
 
