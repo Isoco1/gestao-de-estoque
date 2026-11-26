@@ -1,78 +1,80 @@
-# Gestão de Estoque 🍕📦
+# Inventory Management 🍕📦
 
-**Versão atual: 0.3.0** — histórico completo em [CHANGELOG.md](CHANGELOG.md)
+🇧🇷 [Leia em português](README.PT.md)
 
-SaaS multi-tenant de gestão de estoque para pequenos restaurantes, deliveries e
-mercados, com **baixa automática de estoque via WhatsApp (Z-API)**.
+**Current version: 0.3.0** — full history in [CHANGELOG.md](CHANGELOG.md)
 
-O estoque é controlado **por lotes** (validade, fornecedor e custo por lote):
-o saldo de um ingrediente é a soma dos seus lotes ativos, e as baixas seguem
-**FEFO** (*First Expired, First Out* — consome primeiro o lote que vence antes).
+Multi-tenant inventory management SaaS for small restaurants, delivery
+businesses and grocery stores, with **automatic stock deduction via WhatsApp (Z-API)**.
 
-## Funcionalidades
+Stock is tracked **by lot** (expiration date, supplier and cost per lot):
+an ingredient's balance is the sum of its active lots, and deductions follow
+**FEFO** (*First Expired, First Out* — the lot that expires first is consumed first).
 
-- ✅ **Multi-tenant** com isolamento por `tenant_id` em todas as tabelas
-- ✅ **Baixa automática via WhatsApp**: webhook Z-API interpreta o pedido e
-  desconta a ficha técnica do estoque em transação atômica (ACID)
-- ✅ **Controle por lotes com FEFO**: validade, fabricação, fornecedor e
-  custo por lote; vendas nunca consomem lote vencido
-- ✅ **Alertas**: estoque baixo (WhatsApp do gerente) e vencimentos com
-  R$ em risco no dashboard
-- ✅ **Status da conexão Z-API** no dashboard (nunca derruba a aplicação)
-- ✅ **Bloqueio de inadimplentes** (v0.3): tenant `BLOCKED` recebe 403 em
-  toda a API; `PAST_DUE` mantém acesso em carência
-- ✅ **RBAC** (v0.3): papéis `SUPER_ADMIN`, `TENANT_ADMIN` e `TENANT_USER`
-- ✅ **Soft delete com auditoria** (v0.3): exclusão de ingrediente exige
-  justificativa (mínimo 5 caracteres), nunca apaga fisicamente, registra
-  quem/quando/por quê em `AuditLog` e é restaurável pelo painel admin
+## Features
+
+- ✅ **Multi-tenant** with `tenant_id` isolation on every table
+- ✅ **Automatic deduction via WhatsApp**: a Z-API webhook parses the order and
+  deducts the recipe's ingredients from stock in an atomic (ACID) transaction
+- ✅ **Lot control with FEFO**: expiration date, manufacturing date, supplier and
+  cost per lot; sales never consume an expired lot
+- ✅ **Alerts**: low stock (sent to the manager's WhatsApp) and upcoming
+  expirations with the amount (R$) at risk on the dashboard
+- ✅ **Z-API connection status** on the dashboard (never takes the application down)
+- ✅ **Blocking of delinquent accounts** (v0.3): a `BLOCKED` tenant gets 403 on
+  the entire API; `PAST_DUE` keeps access during a grace period
+- ✅ **RBAC** (v0.3): `SUPER_ADMIN`, `TENANT_ADMIN` and `TENANT_USER` roles
+- ✅ **Soft delete with auditing** (v0.3): deleting an ingredient requires a
+  justification (at least 5 characters), never deletes physically, records
+  who/when/why in `AuditLog` and can be restored from the admin panel
 
 ## Stack
 
-| Camada    | Tecnologia                                                    |
+| Layer     | Technology                                                    |
 |-----------|---------------------------------------------------------------|
 | Backend   | Python 3.11+, FastAPI (async), SQLAlchemy 2.0, Alembic        |
-| Banco     | PostgreSQL 16                                                 |
+| Database  | PostgreSQL 16                                                 |
 | Frontend  | Next.js 14 (App Router), TypeScript, Tailwind CSS, Shadcn/UI  |
-| WhatsApp  | Z-API (webhooks de entrada + envio de mensagens)              |
+| WhatsApp  | Z-API (incoming webhooks + message sending)                   |
 
-## Estrutura
+## Structure
 
 ```
 estoque-saas/
-├── docker-compose.yml          # PostgreSQL local
+├── docker-compose.yml          # Local PostgreSQL
 ├── backend/
 │   ├── app/
-│   │   ├── main.py             # Entrada FastAPI
-│   │   ├── core/               # Config (.env) e conexão com o banco
-│   │   ├── models/             # SQLAlchemy 2.0 (todos com tenant_id)
-│   │   │   └── ingredient_lot.py   # Lote: validade, fornecedor, custo
+│   │   ├── main.py             # FastAPI entry point
+│   │   ├── core/               # Config (.env) and database connection
+│   │   ├── models/             # SQLAlchemy 2.0 (all with tenant_id)
+│   │   │   └── ingredient_lot.py   # Lot: expiration, supplier, cost
 │   │   ├── schemas/            # Pydantic v2
-│   │   ├── api/v1/             # Rotas: ingredients (+lots), products,
-│   │   │                       #   inventory (alertas), integrations, webhooks
-│   │   └── services/           # Regras de negócio:
-│   │       ├── stock_service.py    # Baixa FEFO por lotes, atômica (ACID)
-│   │       ├── order_parser.py     # Interpreta a mensagem do WhatsApp
-│   │       └── zapi_client.py      # Envio de mensagens + status da conexão
-│   ├── alembic/                # Migrações
-│   └── seed_dev.py             # Dados de demonstração
+│   │   ├── api/v1/             # Routes: ingredients (+lots), products,
+│   │   │                       #   inventory (alerts), integrations, webhooks
+│   │   └── services/           # Business rules:
+│   │       ├── stock_service.py    # Atomic (ACID) FEFO deduction by lot
+│   │       ├── order_parser.py     # Parses the WhatsApp message
+│   │       └── zapi_client.py      # Message sending + connection status
+│   ├── alembic/                # Migrations
+│   └── seed_dev.py             # Demo data
 └── frontend/
-    ├── app/                    # Páginas: Dashboard, Ingredientes, Fichas Técnicas
-    ├── components/ui/          # Componentes estilo Shadcn/UI
-    └── lib/api.ts              # Cliente HTTP (injeta X-Tenant-ID)
+    ├── app/                    # Pages: Dashboard, Ingredients, Recipes
+    ├── components/ui/          # Shadcn/UI-style components
+    └── lib/api.ts              # HTTP client (injects X-Tenant-ID)
 ```
 
-## Como rodar
+## Getting started
 
-### Opção rápida (Windows)
+### Quick option (Windows)
 
-Com o Docker Desktop aberto, dê dois cliques em `iniciar.bat` (ou rode no terminal).
-Ele sobe o PostgreSQL, prepara o backend, cria os dados de demonstração,
-configura o `frontend/.env.local` com o Tenant ID automaticamente e abre a API
-e o painel em janelas separadas.
+With Docker Desktop running, double-click `iniciar.bat` (or run it from the terminal).
+It starts PostgreSQL, sets up the backend, creates the demo data,
+automatically writes the Tenant ID to `frontend/.env.local`, and opens the API
+and the dashboard in separate windows.
 
 ### Manual
 
-### 1. Banco de dados
+### 1. Database
 
 ```bash
 docker compose up -d
@@ -85,15 +87,15 @@ cd backend
 python -m venv .venv
 .venv\Scripts\activate           # Windows  (Linux/Mac: source .venv/bin/activate)
 pip install -r requirements.txt
-copy .env.example .env           # ajuste se necessário
+copy .env.example .env           # adjust if needed
 
-# Migrações (aplica as revisões versionadas em backend/alembic/versions)
+# Migrations (applies the versioned revisions in backend/alembic/versions)
 alembic upgrade head
 
-# Dados de demonstração (imprime o Tenant ID)
+# Demo data (prints the Tenant ID)
 python seed_dev.py
 
-# Sobe a API
+# Start the API
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -104,73 +106,73 @@ Swagger: http://localhost:8000/docs
 ```bash
 cd frontend
 npm install
-copy .env.local.example .env.local   # cole o Tenant ID impresso pelo seed
+copy .env.local.example .env.local   # paste the Tenant ID printed by the seed
 npm run dev
 ```
 
-Painel: http://localhost:3000
+Dashboard: http://localhost:3000
 
 ## Multi-tenancy
 
-- Toda tabela de dados possui `tenant_id` (FK indexada para `tenants`).
-- No MVP, o tenant é identificado pelo header `X-Tenant-ID`; o webhook
-  identifica o tenant pelo `instanceId` da Z-API (cada instância = 1 número).
-- Próximo passo: autenticação JWT com `tenant_id` na claim, substituindo o
-  header sem alterar as rotas (a dependência `get_current_tenant` é o único
-  ponto de mudança).
+- Every data table has a `tenant_id` (indexed FK to `tenants`).
+- In the MVP, the tenant is identified by the `X-Tenant-ID` header; the webhook
+  identifies the tenant by the Z-API `instanceId` (each instance = 1 phone number).
+- Next step: JWT authentication with `tenant_id` in the claim, replacing the
+  header without changing the routes (the `get_current_tenant` dependency is the
+  only point of change).
 
-## Fluxo da baixa automática (Z-API)
+## Automatic deduction flow (Z-API)
 
-1. Cliente envia no WhatsApp: `2x Pizza Calabresa`
-2. Z-API chama `POST /api/v1/webhooks/z-api`
-3. O sistema identifica o tenant pelo `instanceId`, interpreta a mensagem e:
-   - busca a ficha técnica de cada produto;
-   - calcula a necessidade total de cada ingrediente;
-   - **trava os lotes** (`SELECT ... FOR UPDATE`) e valida a disponibilidade
-     (lotes **vencidos não contam** — não se vende produto vencido);
-   - baixa lote a lote em ordem **FEFO** (vence antes, sai antes), gravando um
-     `StockMovement` por fatia consumida com o `lot_id` (rastreabilidade);
-   - cria `Order`/`OrderItem` — tudo em **uma transação**; erro = rollback total.
-4. Em background: confirma o pedido ao cliente e, se algum ingrediente ficou
-   abaixo do mínimo, envia alerta de estoque baixo ao WhatsApp do gerente.
+1. A customer sends on WhatsApp: `2x Pizza Calabresa`
+2. Z-API calls `POST /api/v1/webhooks/z-api`
+3. The system identifies the tenant by its `instanceId`, parses the message and:
+   - looks up the recipe for each product;
+   - calculates the total amount needed of each ingredient;
+   - **locks the lots** (`SELECT ... FOR UPDATE`) and checks availability
+     (**expired lots don't count** — expired products are never sold);
+   - deducts lot by lot in **FEFO** order (first to expire, first out), recording a
+     `StockMovement` with the `lot_id` for each portion consumed (traceability);
+   - creates the `Order`/`OrderItem` — all in **a single transaction**; any error = full rollback.
+4. In the background: confirms the order to the customer and, if any ingredient fell
+   below its minimum, sends a low-stock alert to the manager's WhatsApp.
 
-## Lotes, validade e integrações (endpoints principais)
+## Lots, expiration and integrations (main endpoints)
 
-| Endpoint | Função |
-|----------|--------|
-| `GET /api/v1/ingredients/{id}/lots` | Lotes do ingrediente + estoque total + custo médio ponderado |
-| `POST /api/v1/ingredients/{id}/lots` | Entrada de novo lote (fornecedor, custo, validade) |
-| `GET /api/v1/inventory/expiration-alerts?days=7` | Lotes vencidos e a vencer, com R$ em risco |
-| `GET /api/v1/integrations/z-api/status` | Status da conexão WhatsApp (nunca retorna 5xx) |
-| `POST /api/v1/ingredients/{id}/stock-entries` | Entrada avulsa (+) ou perda/descarte FEFO (−, inclui vencidos) |
-| `DELETE /api/v1/ingredients/{id}` | Exclusão lógica — corpo `{"reason": "..."}` obrigatório (mín. 5 caracteres) |
-| `GET /api/v1/admin/tenants/{id}/deleted-ingredients` | (SUPER_ADMIN) Excluídos do tenant: quem, quando e justificativa |
-| `POST /api/v1/admin/ingredients/{id}/restore` | (SUPER_ADMIN) Restaura ingrediente excluído, com auditoria |
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/v1/ingredients/{id}/lots` | Ingredient lots + total stock + weighted average cost |
+| `POST /api/v1/ingredients/{id}/lots` | New lot entry (supplier, cost, expiration) |
+| `GET /api/v1/inventory/expiration-alerts?days=7` | Expired and soon-to-expire lots, with R$ at risk |
+| `GET /api/v1/integrations/z-api/status` | WhatsApp connection status (never returns 5xx) |
+| `POST /api/v1/ingredients/{id}/stock-entries` | Ad-hoc entry (+) or FEFO loss/disposal (−, includes expired lots) |
+| `DELETE /api/v1/ingredients/{id}` | Soft delete — body `{"reason": "..."}` required (min. 5 characters) |
+| `GET /api/v1/admin/tenants/{id}/deleted-ingredients` | (SUPER_ADMIN) Tenant's deleted ingredients: who, when and why |
+| `POST /api/v1/admin/ingredients/{id}/restore` | (SUPER_ADMIN) Restores a deleted ingredient, with auditing |
 
-## Acesso e segurança (v0.3)
+## Access and security (v0.3)
 
-- **Identificação (MVP, pré-JWT)**: `X-Tenant-ID` identifica o tenant e
-  `X-User-ID` o usuário (auditoria e rotas `/admin`). O seed imprime os IDs
-  de demonstração (SUPER_ADMIN e TENANT_ADMIN).
-- **Bloqueio automático**: `Tenant.status = blocked` → toda rota responde
-  `403 "Assinatura suspensa. Entre em contato com o suporte..."`, e o
-  webhook ignora as vendas. `past_due` mantém o acesso (carência).
-- **Regra de ouro do soft delete**: nenhuma exclusão física em tabelas
-  críticas; listagens filtram `deleted_at IS NULL` automaticamente e cada
-  exclusão/restauração gera um registro imutável em `audit_logs`.
+- **Identification (MVP, pre-JWT)**: `X-Tenant-ID` identifies the tenant and
+  `X-User-ID` the user (auditing and `/admin` routes). The seed prints the demo
+  IDs (SUPER_ADMIN and TENANT_ADMIN).
+- **Automatic blocking**: `Tenant.status = blocked` → every route returns
+  `403 "Assinatura suspensa. Entre em contato com o suporte..."` (subscription
+  suspended), and the webhook ignores sales. `past_due` keeps access (grace period).
+- **Golden rule of soft delete**: no physical deletion on critical tables;
+  listings automatically filter `deleted_at IS NULL`, and every
+  deletion/restoration creates an immutable record in `audit_logs`.
 
-### Testar o webhook sem WhatsApp
+### Testing the webhook without WhatsApp
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/webhooks/z-api -H "Content-Type: application/json" -d "{\"instanceId\": \"DEMO_INSTANCE_123\", \"phone\": \"5511988887777\", \"fromMe\": false, \"isGroup\": false, \"text\": {\"message\": \"2x Pizza Calabresa\"}}"
 ```
 
-## Roadmap (próximas etapas)
+## Roadmap (next steps)
 
-- [ ] Autenticação JWT (login por tenant) e RBAC
-- [ ] Tela de histórico de movimentações e vendas
-- [ ] Janela de detalhes de lotes no painel (a API `GET /ingredients/{id}/lots` já existe)
-- [ ] Cadastro/edição de produtos com preço e categorias
-- [ ] Parser de pedidos com LLM (mensagens livres) mantendo a interface atual
-- [ ] Relatórios de custo (CMV) usando o custo real por lote
-- [ ] Onboarding de tenants (cadastro self-service + credenciais Z-API)
+- [ ] JWT authentication (per-tenant login) and RBAC
+- [ ] Stock movement and sales history screen
+- [ ] Lot details window in the dashboard (the `GET /ingredients/{id}/lots` API already exists)
+- [ ] Product registration/editing with prices and categories
+- [ ] LLM-based order parser (free-form messages) keeping the current interface
+- [ ] Cost reports (COGS) using the real cost per lot
+- [ ] Tenant onboarding (self-service sign-up + Z-API credentials)
